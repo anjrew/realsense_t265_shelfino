@@ -9,18 +9,20 @@ namespace realsense2_camera
 {
     class ParametersBackend
     {
-        public:
-            ParametersBackend(rclcpp::Node& node) : 
-                _node(node),
-                _logger(node.get_logger())
-                {};
-            ~ParametersBackend();
-            void add_on_set_parameters_callback(rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType callback);
+    public:
+        ParametersBackend(rclcpp::Node &node) : _node(node),
+                                                _logger(node.get_logger()) {};
+        ~ParametersBackend();
 
+        // Use the modern callback type definition from rclcpp::Node.
+        void add_on_set_parameters_callback(
+            rclcpp::Node::OnSetParametersCallbackHandle::OnSetParametersCallbackType callback);
 
-        private:
-            rclcpp::Node& _node;
-            rclcpp::Logger _logger;
-            std::shared_ptr<void> _ros_callback;
+    private:
+        rclcpp::Node &_node;
+        rclcpp::Logger _logger;
+
+        // The handle now has a specific, type-safe pointer.
+        rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr _ros_callback;
     };
 }

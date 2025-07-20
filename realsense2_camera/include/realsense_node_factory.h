@@ -26,19 +26,19 @@ namespace realsense2_camera
     class RealSenseNodeFactory : public rclcpp::Node
     {
     public:
-        explicit RealSenseNodeFactory(const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
+        explicit RealSenseNodeFactory(const rclcpp::NodeOptions &node_options = rclcpp::NodeOptions().enable_logger_service(true));
         RealSenseNodeFactory(
-            const std::string & node_name, const std::string & ns,
-            const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
+            const std::string &node_name, const std::string &ns,
+            const rclcpp::NodeOptions &node_options = rclcpp::NodeOptions());
         virtual ~RealSenseNodeFactory();
 
     private:
         void init();
         void closeDevice();
         void startDevice();
-        void changeDeviceCallback(rs2::event_information& info);
+        void changeDeviceCallback(rs2::event_information &info);
         void getDevice(rs2::device_list list);
-        void tryGetLogSeverity(rs2_log_severity& severity) const;
+        void tryGetLogSeverity(rs2_log_severity &severity) const;
         static std::string parseUsbPort(std::string line);
 
         rclcpp::Node::SharedPtr _node;
@@ -56,4 +56,4 @@ namespace realsense2_camera
         rclcpp::Logger _logger;
         std::shared_ptr<Parameters> _parameters;
     };
-}//end namespace
+} // end namespace

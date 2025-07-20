@@ -14,73 +14,85 @@ void BaseRealSenseNode::getParameters()
     std::string param_name;
     param_name = std::string("camera_name");
     _camera_name = _parameters->setParam<std::string>(param_name, "camera");
+    ROS_INFO_STREAM(param_name << " = " << _camera_name);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("publish_tf");
     _publish_tf = _parameters->setParam<bool>(param_name, PUBLISH_TF);
+    ROS_INFO_STREAM(param_name << " = " << (_publish_tf ? "true" : "false"));
     _parameters_names.push_back(param_name);
 
     param_name = std::string("tf_publish_rate");
-    _parameters->setParamT(param_name, _tf_publish_rate, [this](const rclcpp::Parameter& )
-            {
-                startDynamicTf();
-            });
+    _parameters->setParamT(param_name, _tf_publish_rate, [this](const rclcpp::Parameter &)
+                           { startDynamicTf(); });
+    ROS_INFO_STREAM(param_name << " = " << _tf_publish_rate);
     _parameters_names.push_back(param_name);
     startDynamicTf();
 
     param_name = std::string("diagnostics_period");
     _diagnostics_period = _parameters->setParam<double>(param_name, DIAGNOSTICS_PERIOD);
+    ROS_INFO_STREAM(param_name << " = " << _diagnostics_period);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("enable_sync");
     _parameters->setParamT(param_name, _sync_frames);
+    ROS_INFO_STREAM(param_name << " = " << (_sync_frames ? "true" : "false"));
     _parameters_names.push_back(param_name);
 
     param_name = std::string("json_file_path");
     _json_file_path = _parameters->setParam<std::string>(param_name, "");
+    ROS_INFO_STREAM(param_name << " = " << _json_file_path);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("clip_distance");
     _clipping_distance = _parameters->setParam<double>(param_name, -1.0);
+    ROS_INFO_STREAM(param_name << " = " << _clipping_distance);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("linear_accel_cov");
     _linear_accel_cov = _parameters->setParam<double>(param_name, 0.01);
+    ROS_INFO_STREAM(param_name << " = " << _linear_accel_cov);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("angular_velocity_cov");
     _angular_velocity_cov = _parameters->setParam<double>(param_name, 0.01);
+    ROS_INFO_STREAM(param_name << " = " << _angular_velocity_cov);
     _parameters_names.push_back(param_name);
-   
+
     param_name = std::string("hold_back_imu_for_frames");
     _hold_back_imu_for_frames = _parameters->setParam<bool>(param_name, HOLD_BACK_IMU_FOR_FRAMES);
+    ROS_INFO_STREAM(param_name << " = " << (_hold_back_imu_for_frames ? "true" : "false"));
     _parameters_names.push_back(param_name);
 
     param_name = std::string("tf_ns");
     _tf_ns = _parameters->setParam<std::string>(param_name, "tf_default");
+    ROS_INFO_STREAM(param_name << " = " << _tf_ns);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("odom_tf");
     _odom_tf = _parameters->setParam<std::string>(param_name, DEFAULT_ODOM_FRAME_ID);
+    ROS_INFO_STREAM(param_name << " = " << _odom_tf);
     _parameters_names.push_back(param_name);
 
     param_name = std::string("publish_odom_tf");
     _publish_odom_tf = _parameters->setParam<bool>(param_name, PUBLISH_ODOM_TF);
+    ROS_INFO_STREAM(param_name << " = " << (_publish_odom_tf ? "true" : "false"));
     _parameters_names.push_back(param_name);
 
     param_name = std::string("base_frame_id");
     _base_frame_id = _parameters->setParam<std::string>(param_name, DEFAULT_BASE_FRAME_ID);
-    _base_frame_id = (static_cast<std::ostringstream&&>(std::ostringstream() << _tf_ns << (_camera_name != "" ? ("/"+_camera_name) : "")  << "/" << "base_camera_link")).str();
+    ROS_INFO_STREAM(param_name << " (before override) = " << _base_frame_id);
+    _base_frame_id = (static_cast<std::ostringstream &&>(std::ostringstream() << _tf_ns << (_camera_name != "" ? ("/" + _camera_name) : "") << "/" << "base_camera_link")).str();
+    ROS_INFO_STREAM(param_name << " (constructed) = " << _base_frame_id);
     _parameters_names.push_back(param_name);
 }
-
 void BaseRealSenseNode::setDynamicParams()
 {
     // Set default values:
     _imu_sync_method = imu_sync_method::NONE;
 
-    auto imu_sync_method_string = [](imu_sync_method value) 
-    { 
+    auto imu_sync_method_string = [](imu_sync_method value)
+    {
         switch (value)
         {
         case imu_sync_method::COPY:
@@ -95,19 +107,20 @@ void BaseRealSenseNode::setDynamicParams()
     // Register ROS parameter:
     std::string param_name("unite_imu_method");
 
-    std::vector<std::pair<std::string, int> > enum_vec;
+    std::vector<std::pair<std::string, int>> enum_vec;
     size_t longest_desc(0);
-    for (int i=0; i<=int(imu_sync_method::LINEAR_INTERPOLATION); i++)
+    for (int i = 0; i <= int(imu_sync_method::LINEAR_INTERPOLATION); i++)
     {
         std::string enum_str(imu_sync_method_string(imu_sync_method(i)));
         enum_vec.push_back(std::make_pair(enum_str, i));
         longest_desc = std::max(longest_desc, enum_str.size());
     }
-    sort(enum_vec.begin(), enum_vec.end(), [](std::pair<std::string, int> e1, std::pair<std::string, int> e2){return (e1.second < e2.second);});
+    sort(enum_vec.begin(), enum_vec.end(), [](std::pair<std::string, int> e1, std::pair<std::string, int> e2)
+         { return (e1.second < e2.second); });
     std::stringstream enum_str_values;
     for (auto vec_iter : enum_vec)
     {
-        enum_str_values << std::setw(longest_desc+6) << std::left << vec_iter.first << " : " << vec_iter.second << std::endl;
+        enum_str_values << std::setw(longest_desc + 6) << std::left << vec_iter.first << " : " << vec_iter.second << std::endl;
     }
 
     rcl_interfaces::msg::ParameterDescriptor crnt_descriptor;
@@ -116,23 +129,20 @@ void BaseRealSenseNode::setDynamicParams()
     range.to_value = int(imu_sync_method::LINEAR_INTERPOLATION);
     crnt_descriptor.integer_range.push_back(range);
     std::stringstream desc;
-    desc << "Available options are:" << std::endl << enum_str_values.str();
+    desc << "Available options are:" << std::endl
+         << enum_str_values.str();
     crnt_descriptor.description = desc.str();
-    _parameters->setParam<int>(param_name, int(imu_sync_method::NONE), 
-                            [this](const rclcpp::Parameter& parameter)
-                            {
-                                _imu_sync_method = imu_sync_method(parameter.get_value<int>());
-                            }, crnt_descriptor);
+    _parameters->setParam<int>(param_name, int(imu_sync_method::NONE), [this](const rclcpp::Parameter &parameter)
+                               { _imu_sync_method = imu_sync_method(parameter.get_value<int>()); }, crnt_descriptor);
     _parameters_names.push_back(param_name);
 }
 
 void BaseRealSenseNode::clearParameters()
 {
-    while ( !_parameters_names.empty() )
+    while (!_parameters_names.empty())
     {
         auto name = _parameters_names.back();
         _parameters->removeParam(name);
-        _parameters_names.pop_back();        
+        _parameters_names.pop_back();
     }
 }
-

@@ -7,46 +7,45 @@
 using namespace realsense2_camera;
 using namespace rs2;
 
-ProfilesManager::ProfilesManager(std::shared_ptr<Parameters> parameters, rclcpp::Logger logger):
-    _logger(logger),
-    _params(parameters, _logger)
-     {
-     }
+ProfilesManager::ProfilesManager(std::shared_ptr<Parameters> parameters, rclcpp::Logger logger) : _logger(logger),
+                                                                                                  _params(parameters, _logger)
+{
+}
 
 void ProfilesManager::clearParameters()
 {
-    while ( !_parameters_names.empty() )
+    while (!_parameters_names.empty())
     {
         auto name = _parameters_names.back();
         _params.getParameters()->removeParam(name);
-        _parameters_names.pop_back();        
+        _parameters_names.pop_back();
     }
 }
 
 std::string applyTemplateName(std::string template_name, stream_index_pair sip)
 {
     const std::string stream_name(create_graph_resource_name(STREAM_NAME(sip)));
-    char* param_name = new char[template_name.size() + stream_name.size()];
+    char *param_name = new char[template_name.size() + stream_name.size()];
     sprintf(param_name, template_name.c_str(), stream_name.c_str());
     return std::string(param_name);
 }
 
-void ProfilesManager::registerSensorQOSParam(std::string template_name, 
-                                          std::set<stream_index_pair> unique_sips, 
-                                          std::map<stream_index_pair, std::shared_ptr<std::string> >& params, 
-                                          std::string value)
+void ProfilesManager::registerSensorQOSParam(std::string template_name,
+                                             std::set<stream_index_pair> unique_sips,
+                                             std::map<stream_index_pair, std::shared_ptr<std::string>> &params,
+                                             std::string value)
 {
     // For each pair of stream-index, Function add a QOS parameter to <params> and advertise it by <template_name>.
     // parameters in <params> are dynamically being updated. If invalid they are reverted.
-    for (auto& sip : unique_sips)
+    for (auto &sip : unique_sips)
     {
         std::string param_name = applyTemplateName(template_name, sip);
         params[sip] = std::make_shared<std::string>(value);
         std::shared_ptr<std::string> param = params[sip];
         rcl_interfaces::msg::ParameterDescriptor crnt_descriptor;
         crnt_descriptor.description = "Available options are:\n" + list_available_qos_strings();
-        _params.getParameters()->setParam<std::string>(param_name, value, [this, param](const rclcpp::Parameter& parameter)
-                {
+        _params.getParameters()->setParam<std::string>(param_name, value, [this, param](const rclcpp::Parameter &parameter)
+                                                       {
                     try
                     {
                         qos_string_to_qos(parameter.get_value<std::string>());
@@ -57,40 +56,37 @@ void ProfilesManager::registerSensorQOSParam(std::string template_name,
                     {
                         ROS_ERROR_STREAM("Given value, " << parameter.get_value<std::string>() << " is unknown. Set ROS param back to: " << *param);
                         _params.getParameters()->queueSetRosValue(parameter.get_name(), *param);
-                    }
-                }, crnt_descriptor);
+                    } }, crnt_descriptor);
         _parameters_names.push_back(param_name);
     }
 }
 
-template<class T>
-void ProfilesManager::registerSensorUpdateParam(std::string template_name, 
-                                                std::set<stream_index_pair> unique_sips, 
-                                                std::map<stream_index_pair, std::shared_ptr<T> >& params, 
-                                                T value, 
+template <class T>
+void ProfilesManager::registerSensorUpdateParam(std::string template_name,
+                                                std::set<stream_index_pair> unique_sips,
+                                                std::map<stream_index_pair, std::shared_ptr<T>> &params,
+                                                T value,
                                                 std::function<void()> update_sensor_func)
 {
     // This function registers parameters that their modification requires a sensor update.
     // For each pair of stream-index, Function add a parameter to <params>, if does not exist yet, and advertise it by <template_name>.
     // parameters in <params> are dynamically being updated.
-    for (auto& sip : unique_sips)
+    for (auto &sip : unique_sips)
     {
         std::string param_name = applyTemplateName(template_name, sip);
         if (params.find(sip) == params.end())
             params[sip] = std::make_shared<T>(value);
         std::shared_ptr<T> param = params[sip];
-        _params.getParameters()->setParam<T>(param_name, *(params[sip]), [param, update_sensor_func](const rclcpp::Parameter& parameter)
-                {
+        _params.getParameters()->setParam<T>(param_name, *(params[sip]), [param, update_sensor_func](const rclcpp::Parameter &parameter)
+                                             {
                     *param = parameter.get_value<T>();
-                    update_sensor_func();
-                });
+                    update_sensor_func(); });
         _parameters_names.push_back(param_name);
     }
 }
 
-template void ProfilesManager::registerSensorUpdateParam<bool>(std::string template_name, std::set<stream_index_pair> unique_sips, std::map<stream_index_pair, std::shared_ptr<bool> >& params, bool value, std::function<void()> update_sensor_func);
-template void ProfilesManager::registerSensorUpdateParam<int>(std::string template_name, std::set<stream_index_pair> unique_sips, std::map<stream_index_pair, std::shared_ptr<int> >& params, int value, std::function<void()> update_sensor_func);
-
+template void ProfilesManager::registerSensorUpdateParam<bool>(std::string template_name, std::set<stream_index_pair> unique_sips, std::map<stream_index_pair, std::shared_ptr<bool>> &params, bool value, std::function<void()> update_sensor_func);
+template void ProfilesManager::registerSensorUpdateParam<int>(std::string template_name, std::set<stream_index_pair> unique_sips, std::map<stream_index_pair, std::shared_ptr<int>> &params, int value, std::function<void()> update_sensor_func);
 
 bool ProfilesManager::isTypeExist()
 {
@@ -100,7 +96,7 @@ bool ProfilesManager::isTypeExist()
 rs2::stream_profile ProfilesManager::getDefaultProfile()
 {
     rs2::stream_profile default_profile;
-    if (_all_profiles.empty()) 
+    if (_all_profiles.empty())
         throw std::runtime_error("Wrong commands sequence. No profiles set.");
 
     for (auto profile : _all_profiles)
@@ -118,77 +114,98 @@ rs2::stream_profile ProfilesManager::getDefaultProfile()
     return default_profile;
 }
 
-void ProfilesManager::addWantedProfiles(std::vector<rs2::stream_profile>& wanted_profiles)
-{    
+void ProfilesManager::addWantedProfiles(std::vector<rs2::stream_profile> &wanted_profiles)
+{
+    ROS_INFO("addWantedProfiles: Start. Iterating through all available device profiles to find wanted ones...");
     std::map<stream_index_pair, bool> found_sips;
     for (auto profile : _all_profiles)
     {
         stream_index_pair sip(profile.stream_type(), profile.stream_index());
-        if (!(*_enabled_profiles[sip])) continue;
+        ROS_INFO_STREAM(" "); // Add a blank line for readability
+        ROS_INFO_STREAM("...Evaluating profile: "
+                        << rs2_stream_to_string(sip.first) << "(" << sip.second << ")");
+
+        // First check: Is the stream enabled by its ROS parameter (e.g., enable_pose)?
+        if (_enabled_profiles.find(sip) == _enabled_profiles.end())
+        {
+            ROS_WARN_STREAM("    -> Stream '" << rs2_stream_to_string(sip.first) << "' not found in enabled_profiles map. Skipping.");
+            continue;
+        }
+        bool is_enabled = (*_enabled_profiles[sip]);
+        ROS_INFO_STREAM("    -> Is stream enabled by parameter? " << (is_enabled ? "Yes." : "No."));
+        if (!is_enabled)
+        {
+            continue;
+        }
+
+        // Second check: Have we already found a matching profile for this stream?
         if (found_sips.find(sip) == found_sips.end())
         {
             found_sips[sip] = false;
         }
         else
         {
-            if (found_sips.at(sip) == true) continue;
+            if (found_sips.at(sip) == true)
+            {
+                ROS_INFO("    -> Already found a match for this stream type. Skipping.");
+                continue;
+            }
         }
-        if (isWantedProfile(profile))
+
+        // Third check: Does this specific profile meet the criteria (resolution, format, etc.)?
+        bool is_wanted = isWantedProfile(profile);
+        ROS_INFO_STREAM("    -> Does profile match criteria (isWantedProfile)? " << (is_wanted ? "Yes." : "No."));
+        if (is_wanted)
         {
             wanted_profiles.push_back(profile);
             found_sips[sip] = true;
-            ROS_DEBUG_STREAM("Found profile for " << ros_stream_to_string(sip.first) << ":" << sip.second);
+            ROS_INFO_STREAM("    --> SUCCESS: Added this profile to the list of wanted profiles.");
         }
     }
+    ROS_INFO_STREAM(" ");
+    ROS_INFO_STREAM("addWantedProfiles: Finished. Total wanted profiles found: " << wanted_profiles.size());
 }
 
-std::string ProfilesManager::profile_string(const rs2::stream_profile& profile)
+std::string ProfilesManager::profile_string(const rs2::stream_profile &profile)
 {
     std::stringstream profile_str;
     if (profile.is<rs2::video_stream_profile>())
     {
         auto video_profile = profile.as<rs2::video_stream_profile>();
-        profile_str << "stream_type: " << ros_stream_to_string(video_profile.stream_type()) << "(" << video_profile.stream_index() << ")" <<
-                       ", Format: " << video_profile.format() <<
-                       ", Width: " << video_profile.width() <<
-                       ", Height: " << video_profile.height() <<
-                       ", FPS: " << video_profile.fps();
+        profile_str << "stream_type: " << ros_stream_to_string(video_profile.stream_type()) << "(" << video_profile.stream_index() << ")" << ", Format: " << video_profile.format() << ", Width: " << video_profile.width() << ", Height: " << video_profile.height() << ", FPS: " << video_profile.fps();
     }
     else
     {
-        profile_str << "stream_type: " << ros_stream_to_string(profile.stream_type()) << "(" << profile.stream_index() << ")" <<
-                       "Format: " << profile.format() <<
-                       ", FPS: " << profile.fps();
+        profile_str << "stream_type: " << ros_stream_to_string(profile.stream_type()) << "(" << profile.stream_index() << ")" << "Format: " << profile.format() << ", FPS: " << profile.fps();
     }
     return profile_str.str();
 }
 
-bool ProfilesManager::hasSIP(const stream_index_pair& sip) const
+bool ProfilesManager::hasSIP(const stream_index_pair &sip) const
 {
     return (_enabled_profiles.find(sip) != _enabled_profiles.end());
 }
 
-rmw_qos_profile_t ProfilesManager::getQOS(const stream_index_pair& sip) const
+rmw_qos_profile_t ProfilesManager::getQOS(const stream_index_pair &sip) const
 {
     return qos_string_to_qos(*(_profiles_image_qos_str.at(sip)));
 }
 
-rmw_qos_profile_t ProfilesManager::getInfoQOS(const stream_index_pair& sip) const
+rmw_qos_profile_t ProfilesManager::getInfoQOS(const stream_index_pair &sip) const
 {
     return qos_string_to_qos(*(_profiles_info_qos_str.at(sip)));
 }
 
 VideoProfilesManager::VideoProfilesManager(std::shared_ptr<Parameters> parameters,
-                                           const std::string& module_name, rclcpp::Logger logger, bool force_image_default_qos):
-    ProfilesManager(parameters, logger),
-    _module_name(module_name),
-    _force_image_default_qos(force_image_default_qos)
+                                           const std::string &module_name, rclcpp::Logger logger, bool force_image_default_qos) : ProfilesManager(parameters, logger),
+                                                                                                                                  _module_name(module_name),
+                                                                                                                                  _force_image_default_qos(force_image_default_qos)
 {
     _allowed_formats[RS2_STREAM_DEPTH] = RS2_FORMAT_Z16;
     _allowed_formats[RS2_STREAM_INFRARED] = RS2_FORMAT_Y8;
 }
 
-bool VideoProfilesManager::isSameProfileValues(const rs2::stream_profile& profile, const int width, const int height, const int fps)
+bool VideoProfilesManager::isSameProfileValues(const rs2::stream_profile &profile, const int width, const int height, const int fps)
 {
     if (!profile.is<rs2::video_stream_profile>())
         return false;
@@ -198,10 +215,10 @@ bool VideoProfilesManager::isSameProfileValues(const rs2::stream_profile& profil
     return ((video_profile.width() == width) &&
             (video_profile.height() == height) &&
             (video_profile.fps() == fps) &&
-            (_allowed_formats.find(video_profile.stream_type()) == _allowed_formats.end() || video_profile.format() == _allowed_formats[video_profile.stream_type()] ));
+            (_allowed_formats.find(video_profile.stream_type()) == _allowed_formats.end() || video_profile.format() == _allowed_formats[video_profile.stream_type()]));
 }
 
-bool VideoProfilesManager::isWantedProfile(const rs2::stream_profile& profile)
+bool VideoProfilesManager::isWantedProfile(const rs2::stream_profile &profile)
 {
     return isSameProfileValues(profile, _width, _height, _fps);
 }
@@ -209,9 +226,10 @@ bool VideoProfilesManager::isWantedProfile(const rs2::stream_profile& profile)
 void VideoProfilesManager::registerProfileParameters(std::vector<stream_profile> all_profiles, std::function<void()> update_sensor_func)
 {
     std::set<stream_index_pair> checked_sips;
-    for (auto& profile : all_profiles)
+    for (auto &profile : all_profiles)
     {
-        if (!profile.is<video_stream_profile>()) continue;
+        if (!profile.is<video_stream_profile>())
+            continue;
         ROS_DEBUG_STREAM("Register profile: " << profile_string(profile));
         _all_profiles.push_back(profile);
         stream_index_pair sip(profile.stream_type(), profile.stream_index());
@@ -223,7 +241,7 @@ void VideoProfilesManager::registerProfileParameters(std::vector<stream_profile>
         registerSensorUpdateParam("enable_%s", checked_sips, _enabled_profiles, true, update_sensor_func);
         registerSensorQOSParam("%s_qos", checked_sips, _profiles_image_qos_str, _force_image_default_qos ? DEFAULT_QOS : IMAGE_QOS);
         registerSensorQOSParam("%s_info_qos", checked_sips, _profiles_info_qos_str, DEFAULT_QOS);
-        for (auto& sip : checked_sips)
+        for (auto &sip : checked_sips)
         {
             ROS_DEBUG_STREAM(__LINE__ << ": _enabled_profiles[" << ros_stream_to_string(sip.first) << ":" << sip.second << "]: " << *(_enabled_profiles[sip]));
         }
@@ -235,7 +253,7 @@ void VideoProfilesManager::registerProfileParameters(std::vector<stream_profile>
 std::string VideoProfilesManager::get_profiles_descriptions()
 {
     std::set<std::string> profiles_str;
-    for (auto& profile : _all_profiles)
+    for (auto &profile : _all_profiles)
     {
         auto video_profile = profile.as<rs2::video_stream_profile>();
         std::stringstream crnt_profile_str;
@@ -243,7 +261,7 @@ std::string VideoProfilesManager::get_profiles_descriptions()
         profiles_str.insert(crnt_profile_str.str());
     }
     std::stringstream descriptors_strm;
-    for (auto& profile_str : profiles_str)
+    for (auto &profile_str : profiles_str)
     {
         descriptors_strm << profile_str << "\n";
     }
@@ -268,8 +286,8 @@ void VideoProfilesManager::registerVideoSensorParams()
     crnt_descriptor.description = "Available options are:\n" + get_profiles_descriptions();
     std::stringstream crnt_profile_str;
     crnt_profile_str << _width << "x" << _height << "x" << _fps;
-    _params.getParameters()->setParam<std::string>(param_name, crnt_profile_str.str(), [this](const rclcpp::Parameter& parameter)
-            {
+    _params.getParameters()->setParam<std::string>(param_name, crnt_profile_str.str(), [this](const rclcpp::Parameter &parameter)
+                                                   {
                 std::regex self_regex("\\s*([0-9]+)\\s*[xX,]\\s*([0-9]+)\\s*[xX,]\\s*([0-9]+)\\s*", std::regex_constants::ECMAScript);
                 std::smatch match;
                 std::string profile_str(parameter.get_value<std::string>());
@@ -313,35 +331,56 @@ void VideoProfilesManager::registerVideoSensorParams()
                         ROS_ERROR_STREAM("Given value, " << parameter.get_value<std::string>() << " is invalid. Set ROS param back to: " << crnt_profile_str.str());
                     }
                     _params.getParameters()->queueSetRosValue(parameter.get_name(), crnt_profile_str.str());
-                }
-            }, crnt_descriptor);
+                } }, crnt_descriptor);
     _parameters_names.push_back(param_name);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-bool MotionProfilesManager::isSameProfileValues(const rs2::stream_profile& profile, const rs2_stream stype, const int fps)
+bool MotionProfilesManager::isSameProfileValues(const rs2::stream_profile &profile, const rs2_stream stype, const int fps)
 {
-    return (profile.stream_type() == stype && profile.fps() == fps);
+    // This function compares a specific profile against a desired type and FPS.
+    bool res = (profile.stream_type() == stype && profile.fps() == fps);
+
+    // ADDED LOG:
+    ROS_INFO_STREAM("      ->-> isSameProfileValues check:"
+                    << "\n        - Profile's actual [type, fps]: [" << rs2_stream_to_string(profile.stream_type()) << ", " << profile.fps() << "]"
+                    << "\n        - Wanted [type, fps]:         [" << rs2_stream_to_string(stype) << ", " << fps << "]"
+                    << "\n        - Result: " << (res ? "Match." : "No Match."));
+    return res;
 }
 
-bool MotionProfilesManager::isWantedProfile(const rs2::stream_profile& profile)
+bool MotionProfilesManager::isWantedProfile(const rs2::stream_profile &profile)
 {
+    // This function gets the desired FPS for a stream and calls the checker function.
     stream_index_pair stream(profile.stream_type(), profile.stream_index());
-    return (isSameProfileValues(profile, profile.stream_type(), *(_fps[stream])));
+
+    // ADDED LOG:
+    int wanted_fps = *(_fps[stream]);
+    ROS_INFO_STREAM("    -> Checking isWantedProfile for " << rs2_stream_to_string(stream.first) << "(" << stream.second << ")"
+                                                           << ". Desired FPS from parameters is: " << wanted_fps);
+
+    bool res = (isSameProfileValues(profile, profile.stream_type(), wanted_fps));
+
+    // The final result of the top-level check:
+    ROS_INFO_STREAM("    -> isWantedProfile result: " << (res ? "Yes." : "No.")); // This is redundant since the sub-function already logs the result.
+
+    return res;
 }
 
 void MotionProfilesManager::registerProfileParameters(std::vector<stream_profile> all_profiles, std::function<void()> update_sensor_func)
 {
     std::set<stream_index_pair> checked_sips;
-    for (auto& profile : all_profiles)
+    for (auto &profile : all_profiles)
     {
-        if (!profile.is<motion_stream_profile>()) continue;
+        if (!profile.is<motion_stream_profile>())
+            continue;
         _all_profiles.push_back(profile);
         stream_index_pair sip(profile.stream_type(), profile.stream_index());
         checked_sips.insert(sip);
     }
-    if (_all_profiles.empty()) return;
+    if (_all_profiles.empty())
+        return;
     registerFPSParams();
 
     registerSensorUpdateParam("enable_%s", checked_sips, _enabled_profiles, true, update_sensor_func);
@@ -351,8 +390,8 @@ void MotionProfilesManager::registerProfileParameters(std::vector<stream_profile
 
 std::map<stream_index_pair, std::vector<int>> MotionProfilesManager::getAvailableFPSValues()
 {
-    std::map<stream_index_pair, std::vector<int>> res;    
-    for (auto& profile : _all_profiles)
+    std::map<stream_index_pair, std::vector<int>> res;
+    for (auto &profile : _all_profiles)
     {
         stream_index_pair sip(profile.stream_type(), profile.stream_index());
         res[sip].push_back(profile.as<rs2::motion_stream_profile>().fps());
@@ -362,11 +401,12 @@ std::map<stream_index_pair, std::vector<int>> MotionProfilesManager::getAvailabl
 
 void MotionProfilesManager::registerFPSParams()
 {
-    if (_all_profiles.empty()) return;
+    if (_all_profiles.empty())
+        return;
     std::map<stream_index_pair, std::vector<int>> sips_fps_values = getAvailableFPSValues();
 
     // Set default fps to minimum fps available for the stream:
-    for (auto& sip_fps_values : sips_fps_values)
+    for (auto &sip_fps_values : sips_fps_values)
     {
         int min_fps = *(std::min_element(sip_fps_values.second.begin(), sip_fps_values.second.end()));
         _fps.insert(std::pair<stream_index_pair, std::shared_ptr<int>>(sip_fps_values.first, std::make_shared<int>(min_fps)));
@@ -378,7 +418,7 @@ void MotionProfilesManager::registerFPSParams()
     *(_fps[sip]) = default_profile.as<rs2::motion_stream_profile>().fps();
 
     // Register ROS parameters:
-    for (auto& fps : _fps)
+    for (auto &fps : _fps)
     {
         stream_index_pair sip(fps.first);
         std::string param_name = applyTemplateName("%s_fps", sip);
@@ -392,8 +432,8 @@ void MotionProfilesManager::registerFPSParams()
         crnt_descriptor.description = "Available options are:\n" + description;
         std::shared_ptr<int> param(_fps[sip]);
         std::vector<int> available_values(sips_fps_values[sip]);
-        _params.getParameters()->setParam<int>(param_name, *(fps.second), [this, sip](const rclcpp::Parameter& parameter)
-            {
+        _params.getParameters()->setParam<int>(param_name, *(fps.second), [this, sip](const rclcpp::Parameter &parameter)
+                                               {
                 int next_fps(parameter.get_value<int>());
                 bool found(false);
                 bool request_default(false);
@@ -427,10 +467,8 @@ void MotionProfilesManager::registerFPSParams()
                         ROS_ERROR_STREAM("Given value, " << parameter.get_value<int>() << " is invalid. Set ROS param back to: " << *(_fps[sip]));
                     }
                     _params.getParameters()->queueSetRosValue(parameter.get_name(), *(_fps[sip]));
-                }
-            }, crnt_descriptor);
-    _parameters_names.push_back(param_name);
-
+                } }, crnt_descriptor);
+        _parameters_names.push_back(param_name);
     }
 }
 
@@ -439,9 +477,10 @@ void MotionProfilesManager::registerFPSParams()
 void PoseProfilesManager::registerProfileParameters(std::vector<stream_profile> all_profiles, std::function<void()> update_sensor_func)
 {
     std::set<stream_index_pair> checked_sips;
-    for (auto& profile : all_profiles)
+    for (auto &profile : all_profiles)
     {
-        if (!profile.is<pose_stream_profile>()) continue;
+        if (!profile.is<pose_stream_profile>())
+            continue;
         _all_profiles.push_back(profile);
         stream_index_pair sip(profile.stream_type(), profile.stream_index());
         checked_sips.insert(sip);
